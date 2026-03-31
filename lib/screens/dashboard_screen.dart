@@ -5,29 +5,30 @@ import '../providers/providers.dart';
 import '../theme/app_theme.dart';
 import '../models/location_model.dart';
 import '../models/sensor_model.dart';
-
+ 
 // DashboardShell — это "рамка" с AppBar и нижней навигацией
 // Внутри неё меняются вкладки (child)
 class DashboardShell extends ConsumerWidget {
   final Widget child;
   const DashboardShell({super.key, required this.child});
-
+ 
   int _locationIndex(BuildContext context) {
     final location = GoRouterState.of(context).matchedLocation;
     if (location.startsWith('/alarms'))   return 1;
+    if (location.startsWith('/charts'))   return 2;
     if (location.startsWith('/settings')) return 3;
     return 0;
   }
-
+ 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final user      = ref.watch(authProvider).user;
+    final user       = ref.watch(authProvider).user;
     final alarmStats = ref.watch(alarmStatsProvider);
     final activeCount = alarmStats.maybeWhen(
       data: (s) => s['active'] ?? 0,
       orElse: () => 0,
     );
-
+ 
     return Scaffold(
       appBar: AppBar(
         title: const Text('temperature.kz'),
@@ -67,26 +68,44 @@ class DashboardShell extends ConsumerWidget {
             itemBuilder: (_) => <PopupMenuEntry>[
               PopupMenuItem(
                 enabled: false,
-                child: Text(
-                  user?.username ?? '',
-                  style: const TextStyle(fontWeight: FontWeight.w600),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      user?.username ?? '',
+                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                    Text(
+                      user?.roleLabel ?? '',
+                      style: const TextStyle(
+                          fontSize: 12, color: Colors.grey),
+                    ),
+                  ],
                 ),
               ),
               const PopupMenuDivider(),
               const PopupMenuItem(
+                value: 'profile',
+                child: Row(children: [
+                  Icon(Icons.person_outline, size: 18),
+                  SizedBox(width: 8),
+                  Text('Личный кабинет'),
+                ]),
+              ),
+              const PopupMenuItem(
                 value: 'logout',
-                child: Row(
-                  children: [
-                    Icon(Icons.logout, size: 18),
-                    SizedBox(width: 8),
-                    Text('Выйти'),
-                  ],
-                ),
+                child: Row(children: [
+                  Icon(Icons.logout, size: 18),
+                  SizedBox(width: 8),
+                  Text('Выйти'),
+                ]),
               ),
             ],
             onSelected: (value) {
               if (value == 'logout') {
                 ref.read(authProvider.notifier).logout();
+              } else if (value == 'profile') {
+                context.go('/profile');
               }
             },
           ),
@@ -97,10 +116,10 @@ class DashboardShell extends ConsumerWidget {
         selectedIndex: _locationIndex(context),
         onDestinationSelected: (index) {
           switch (index) {
-            case 0: context.go('/dashboard');  break;
-            case 1: context.go('/alarms');     break;
-            case 2: context.go('/dashboard');  break; // отчёты — позже
-            case 3: context.go('/settings');   break;
+            case 0: context.go('/dashboard'); break;
+            case 1: context.go('/alarms');    break;
+            case 2: context.go('/charts');    break;
+            case 3: context.go('/settings');  break;
           }
         },
         destinations: [
@@ -121,7 +140,7 @@ class DashboardShell extends ConsumerWidget {
           const NavigationDestination(
             icon: Icon(Icons.bar_chart_outlined),
             selectedIcon: Icon(Icons.bar_chart),
-            label: 'Отчёты',
+            label: 'Графики',
           ),
           const NavigationDestination(
             icon: Icon(Icons.settings_outlined),
@@ -133,18 +152,18 @@ class DashboardShell extends ConsumerWidget {
     );
   }
 }
-
+ 
 // ── Вкладка мониторинга ────────────────────────────────────────────────
 class MonitoringTab extends ConsumerWidget {
   const MonitoringTab({super.key});
-
+ 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final locationsAsync = ref.watch(locationsProvider);
-
+ 
     return locationsAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
-      error:   (e, _) => Center(
+      error: (e, _) => Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -163,56 +182,38 @@ class MonitoringTab extends ConsumerWidget {
     );
   }
 }
-
+ 
 class _MonitoringList extends StatelessWidget {
   final List<Location> locations;
   const _MonitoringList({required this.locations});
-
+ 
   @override
   Widget build(BuildContext context) {
-    // Считаем общую статистику по всем датчикам
-    final allSensors = locations.expand((l) => l.sensors).toList();
+    final allSensors   = locations.expand((l) => l.sensors).toList();
     final normalCount  = allSensors.where((s) => s.isNormal).length;
     final warningCount = allSensors.where((s) => s.isWarning).length;
     final alarmCount   = allSensors.where((s) => s.isAlarm).length;
     final offlineCount = allSensors.where((s) => !s.isOnline).length;
-
+ 
     return RefreshIndicator(
-      // Потяни вниз — обновит данные
       onRefresh: () async {},
       child: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          // Сводка статусов
+          // Сводка статусов вверху
           Row(
             children: [
-              _StatChip(
-                label: 'Норма',
-                count: normalCount,
-                color: AppColors.normal,
-              ),
+              _StatChip(label: 'Норма',    count: normalCount,  color: AppColors.normal),
               const SizedBox(width: 8),
-              _StatChip(
-                label: 'Внимание',
-                count: warningCount,
-                color: AppColors.warning,
-              ),
+              _StatChip(label: 'Внимание', count: warningCount, color: AppColors.warning),
               const SizedBox(width: 8),
-              _StatChip(
-                label: 'Тревога',
-                count: alarmCount,
-                color: AppColors.alarm,
-              ),
+              _StatChip(label: 'Тревога',  count: alarmCount,   color: AppColors.alarm),
               const SizedBox(width: 8),
-              _StatChip(
-                label: 'Нет связи',
-                count: offlineCount,
-                color: AppColors.offline,
-              ),
+              _StatChip(label: 'Нет связи',count: offlineCount, color: AppColors.offline),
             ],
           ),
           const SizedBox(height: 16),
-
+ 
           // Список локаций
           ...locations.map((loc) => Padding(
             padding: const EdgeInsets.only(bottom: 12),
@@ -223,25 +224,24 @@ class _MonitoringList extends StatelessWidget {
     );
   }
 }
-
-// ── Карточка локации ───────────────────────────────────────────────────
+ 
+// ── Карточка локации со статусом блока управления ─────────────────────
 class _LocationCard extends StatefulWidget {
   final Location location;
   const _LocationCard({required this.location});
-
+ 
   @override
   State<_LocationCard> createState() => _LocationCardState();
 }
-
+ 
 class _LocationCardState extends State<_LocationCard> {
   bool _expanded = true;
-
+ 
   @override
   Widget build(BuildContext context) {
     return Card(
       child: Column(
         children: [
-          // Заголовок — нажать чтобы свернуть/развернуть
           InkWell(
             onTap: () => setState(() => _expanded = !_expanded),
             borderRadius: const BorderRadius.vertical(
@@ -250,71 +250,189 @@ class _LocationCardState extends State<_LocationCard> {
             ),
             child: Padding(
               padding: const EdgeInsets.all(16),
-              child: Row(
+              child: Column(
                 children: [
-                  const Icon(Icons.business, color: AppColors.primary),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          widget.location.name,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w600,
-                            fontSize: 15,
-                          ),
-                        ),
-                        if (widget.location.address != null)
-                          Text(
-                            widget.location.address!,
-                            style: const TextStyle(
-                              color: Colors.grey,
-                              fontSize: 12,
+                  // Строка с названием объекта
+                  Row(
+                    children: [
+                      const Icon(Icons.business, color: AppColors.primary),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              widget.location.name,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 15,
+                              ),
                             ),
-                          ),
+                            if (widget.location.address != null)
+                              Text(
+                                widget.location.address!,
+                                style: const TextStyle(
+                                    color: Colors.grey, fontSize: 12),
+                              ),
+                          ],
+                        ),
+                      ),
+                      if (widget.location.alarmCount > 0)
+                        _MiniChip(
+                            count: widget.location.alarmCount,
+                            color: AppColors.alarm),
+                      if (widget.location.warningCount > 0)
+                        _MiniChip(
+                            count: widget.location.warningCount,
+                            color: AppColors.warning),
+                      const SizedBox(width: 4),
+                      Icon(
+                        _expanded ? Icons.expand_less : Icons.expand_more,
+                        color: Colors.grey,
+                      ),
+                    ],
+                  ),
+ 
+                  // ── Статус блока управления ──────────────────────────
+                  // По ТЗ: отображение питания, GSM, баланса SIM-карты
+                  const SizedBox(height: 10),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.grey.shade200),
+                    ),
+                    child: Row(
+                      children: [
+                        // Питание 220В
+                        _BlockStatusItem(
+                          icon: widget.location.hasPower
+                              ? Icons.power
+                              : Icons.power_off,
+                          color: widget.location.hasPower
+                              ? AppColors.normal
+                              : AppColors.alarm,
+                          label: widget.location.hasPower
+                              ? 'Сеть 220В'
+                              : 'Нет питания',
+                        ),
+                        const SizedBox(width: 16),
+ 
+                        // Уровень GSM сигнала
+                        _GsmIndicator(
+                            level: widget.location.gsmLevel ?? 0),
+                        const SizedBox(width: 16),
+ 
+                        // Баланс SIM-карты
+                        _BlockStatusItem(
+                          icon: Icons.sim_card_outlined,
+                          color: (widget.location.simBalance ?? 0) > 100
+                              ? AppColors.normal
+                              : AppColors.warning,
+                          label: widget.location.simBalance != null
+                              ? '${widget.location.simBalance!.toStringAsFixed(0)} ₸'
+                              : 'SIM —',
+                        ),
                       ],
                     ),
-                  ),
-                  // Счётчики статусов локации
-                  if (widget.location.alarmCount > 0)
-                    _MiniChip(
-                      count: widget.location.alarmCount,
-                      color: AppColors.alarm,
-                    ),
-                  if (widget.location.warningCount > 0)
-                    _MiniChip(
-                      count: widget.location.warningCount,
-                      color: AppColors.warning,
-                    ),
-                  const SizedBox(width: 4),
-                  Icon(
-                    _expanded
-                        ? Icons.expand_less
-                        : Icons.expand_more,
-                    color: Colors.grey,
                   ),
                 ],
               ),
             ),
           ),
-
-          // Датчики
+ 
+          // Список датчиков
           if (_expanded)
-            ...widget.location.sensors.map(
-              (s) => _SensorRow(sensor: s),
-            ),
+            ...widget.location.sensors.map((s) => _SensorRow(sensor: s)),
         ],
       ),
     );
   }
 }
-
+ 
+// ── Элемент статуса блока управления ──────────────────────────────────
+class _BlockStatusItem extends StatelessWidget {
+  final IconData icon;
+  final Color color;
+  final String label;
+ 
+  const _BlockStatusItem({
+    required this.icon,
+    required this.color,
+    required this.label,
+  });
+ 
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 14, color: color),
+        const SizedBox(width: 4),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            color: color,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ],
+    );
+  }
+}
+ 
+// ── Индикатор уровня GSM (4 полоски как на телефоне) ──────────────────
+class _GsmIndicator extends StatelessWidget {
+  final int level; // 0-4
+  const _GsmIndicator({required this.level});
+ 
+  @override
+  Widget build(BuildContext context) {
+    final color = level == 0
+        ? AppColors.alarm
+        : level <= 1
+            ? AppColors.warning
+            : AppColors.normal;
+ 
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        ...List.generate(4, (i) {
+          final isActive = i < level;
+          final height   = 6.0 + i * 3.0;
+          return Container(
+            width: 4,
+            height: height,
+            margin: const EdgeInsets.only(right: 2),
+            decoration: BoxDecoration(
+              color: isActive ? color : Colors.grey.shade300,
+              borderRadius: BorderRadius.circular(1),
+            ),
+          );
+        }),
+        const SizedBox(width: 4),
+        Text(
+          level == 0 ? 'GSM нет' : 'GSM $level/4',
+          style: TextStyle(
+            fontSize: 12,
+            color: color,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ],
+    );
+  }
+}
+ 
 // ── Строка датчика ─────────────────────────────────────────────────────
 class _SensorRow extends StatelessWidget {
   final Sensor sensor;
   const _SensorRow({required this.sensor});
-
+ 
   Color get _statusColor {
     switch (sensor.status) {
       case 'alarm':   return AppColors.alarm;
@@ -323,14 +441,12 @@ class _SensorRow extends StatelessWidget {
       default:        return AppColors.normal;
     }
   }
-
+ 
   @override
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        border: Border(
-          top: BorderSide(color: Colors.grey.shade100),
-        ),
+        border: Border(top: BorderSide(color: Colors.grey.shade100)),
       ),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Row(
@@ -345,14 +461,14 @@ class _SensorRow extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 12),
-
+ 
           Expanded(
             child: Text(
               sensor.name,
               style: const TextStyle(fontSize: 14),
             ),
           ),
-
+ 
           if (!sensor.isOnline)
             const Text(
               'Нет связи',
@@ -375,7 +491,7 @@ class _SensorRow extends StatelessWidget {
               ],
             ),
             const SizedBox(width: 16),
-
+ 
             // Влажность
             Row(
               children: [
@@ -384,14 +500,11 @@ class _SensorRow extends StatelessWidget {
                 const SizedBox(width: 4),
                 Text(
                   '${sensor.humidity?.toStringAsFixed(0)}%',
-                  style: const TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey,
-                  ),
+                  style: const TextStyle(fontSize: 14, color: Colors.grey),
                 ),
               ],
             ),
-
+ 
             // Заряд батареи (если есть)
             if (sensor.batteryLevel != null) ...[
               const SizedBox(width: 12),
@@ -406,10 +519,7 @@ class _SensorRow extends StatelessWidget {
               ),
               Text(
                 '${sensor.batteryLevel}%',
-                style: const TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey,
-                ),
+                style: const TextStyle(fontSize: 12, color: Colors.grey),
               ),
             ],
           ],
@@ -418,7 +528,7 @@ class _SensorRow extends StatelessWidget {
     );
   }
 }
-
+ 
 // ── Вспомогательные виджеты ────────────────────────────────────────────
 class _StatChip extends StatelessWidget {
   final String label;
@@ -429,7 +539,7 @@ class _StatChip extends StatelessWidget {
     required this.count,
     required this.color,
   });
-
+ 
   @override
   Widget build(BuildContext context) {
     return Expanded(
@@ -460,12 +570,12 @@ class _StatChip extends StatelessWidget {
     );
   }
 }
-
+ 
 class _MiniChip extends StatelessWidget {
   final int count;
   final Color color;
   const _MiniChip({required this.count, required this.color});
-
+ 
   @override
   Widget build(BuildContext context) {
     return Container(

@@ -4,7 +4,7 @@ import '../models/user_model.dart';
 import '../models/sensor_model.dart';
 import '../models/location_model.dart';
 import '../models/alarm_model.dart';
-import '../models/user_model.dart';
+
 
 // Dio — это библиотека для HTTP запросов.
 // Думайте о ней как о "почтальоне" который отправляет запросы
@@ -65,6 +65,15 @@ class ApiService {
         }),
       );
       return response.data['access_token'];
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+    Future<User> getMe() async {
+    try {
+      final response = await _dio.get('/users/me');
+      return User.fromJson(response.data);
     } on DioException catch (e) {
       throw _handleError(e);
     }

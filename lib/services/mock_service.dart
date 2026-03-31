@@ -8,34 +8,78 @@ import '../models/alarm_model.dart';
 // и всё приложение заработает с реальными данными без других изменений.
 
 class MockService {
-  // ── Авторизация ──────────────────────────────────────────────────────
 
-  Future<String?> login(String username, String password) async {
+Future<String?> login(String username, String password) async {
     await Future.delayed(const Duration(milliseconds: 800));
-    // Тестовые пользователи
+    if (username == 'superadmin' && password == 'super123') {
+      return 'mock_token_superadmin';
+    }
     if (username == 'admin' && password == 'admin') {
-      return 'mock_jwt_token_admin';
+      return 'mock_token_admin';
     }
-    if (username == 'operator' && password == '1234') {
-      return 'mock_jwt_token_operator';
+    if (username == 'employee' && password == '1234') {
+      return 'mock_token_employee';
     }
-    return null; // неверные данные
+    return null;
   }
 
   Future<User> getMe(String token) async {
     await Future.delayed(const Duration(milliseconds: 300));
-    if (token.contains('admin')) {
-      return const User(
-        id: 1, username: 'admin',
-        email: 'admin@temperature.kz', role: 'admin',
+    if (token.contains('superadmin')) {
+      return User(
+        id: 1, username: 'superadmin',
+        email: 'super@temperature.kz',
+        role: 'superadmin',
+        phone: '+7 777 000 0001',
+        lastLogin: DateTime.now().subtract(const Duration(hours: 1)),
+        allowedLocationIds: [1, 2, 3, 4],
       );
     }
-    return const User(
-      id: 2, username: 'operator',
-      email: 'op@temperature.kz', role: 'viewer',
+    if (token.contains('admin')) {
+      return User(
+        id: 2, username: 'admin',
+        email: 'admin@temperature.kz',
+        role: 'admin',
+        phone: '+7 777 000 0002',
+        lastLogin: DateTime.now().subtract(const Duration(hours: 3)),
+        allowedLocationIds: [1, 2, 3, 4],
+      );
+    }
+    return User(
+      id: 3, username: 'employee',
+      email: 'employee@temperature.kz',
+      role: 'employee',
+      phone: '+7 777 000 0003',
+      lastLogin: DateTime.now().subtract(const Duration(days: 1)),
+      allowedLocationIds: [1, 2], // только склады
     );
   }
 
+  Future<List<User>> getUsers() async {
+    await Future.delayed(const Duration(milliseconds: 400));
+    return [
+      User(id: 1, username: 'superadmin',
+          email: 'super@temperature.kz', role: 'superadmin',
+          phone: '+7 777 000 0001',
+          lastLogin: DateTime.now().subtract(const Duration(hours: 1)),
+          allowedLocationIds: [1, 2, 3, 4]),
+      User(id: 2, username: 'admin',
+          email: 'admin@temperature.kz', role: 'admin',
+          phone: '+7 777 000 0002',
+          lastLogin: DateTime.now().subtract(const Duration(hours: 3)),
+          allowedLocationIds: [1, 2, 3, 4]),
+      User(id: 3, username: 'employee',
+          email: 'employee@temperature.kz', role: 'employee',
+          phone: '+7 777 000 0003',
+          lastLogin: DateTime.now().subtract(const Duration(days: 1)),
+          allowedLocationIds: [1, 2]),
+      User(id: 4, username: 'ivanov',
+          email: 'ivanov@temperature.kz', role: 'employee',
+          phone: '+7 701 123 4567',
+          lastLogin: DateTime.now().subtract(const Duration(days: 2)),
+          allowedLocationIds: [3]),
+    ];
+  }
   // ── Локации с датчиками ───────────────────────────────────────────────
 
   Future<List<Location>> getLocations() async {
@@ -191,22 +235,45 @@ class MockService {
     return true;
   }
 
-// ── Пользователи ──────────────────────────────────────────────────────
+  // ── История показаний для графиков ────────────────────────────────────
+  Future<List<Map<String, dynamic>>> getSensorHistory(
+      int sensorId, int hours) async {
+    await Future.delayed(const Duration(milliseconds: 500));
 
-  Future<List<User>> getUsers() async {
-    await Future.delayed(const Duration(milliseconds: 400));
-    return [
-      const User(id: 1, username: 'admin',
-          email: 'admin@temperature.kz', role: 'admin'),
-      const User(id: 2, username: 'operator',
-          email: 'op@temperature.kz', role: 'viewer'),
-      const User(id: 3, username: 'ivanov',
-          email: 'ivanov@temperature.kz', role: 'editor'),
-      const User(id: 4, username: 'petrova',
-          email: 'petrova@temperature.kz', role: 'viewer'),
-    ];
+    final now = DateTime.now();
+    final random = <Map<String, dynamic>>[];
+
+    // Базовые значения для разных датчиков
+    final baseTemp = switch (sensorId) {
+      101 || 102 => -18.0,
+      103        => -14.0,
+      201        => 3.5,
+      202        => 8.0,
+      301        => 5.0,
+      302        => 18.0,
+      _          => 20.0,
+    };
+    final baseHum = switch (sensorId) {
+      101 || 102 || 103 => 65.0,
+      201 || 202        => 78.0,
+      _                 => 50.0,
+    };
+
+    // Генерируем точки каждые 10 минут
+    final points = hours * 6;
+    for (int i = points; i >= 0; i--) {
+      final time = now.subtract(Duration(minutes: i * 10));
+      // Небольшое случайное колебание
+      final tempVariation = (i % 7 - 3) * 0.3;
+      final humVariation  = (i % 5 - 2) * 0.5;
+      random.add({
+        'timestamp': time.toIso8601String(),
+        'temperature': baseTemp + tempVariation,
+        'humidity': baseHum + humVariation,
+      });
+    }
+    return random;
   }
-
   Future<bool> createUser(String username, String email,
       String password, String role) async {
     await Future.delayed(const Duration(milliseconds: 500));

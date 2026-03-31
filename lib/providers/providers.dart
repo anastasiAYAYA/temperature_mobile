@@ -128,3 +128,27 @@ final usersProvider = FutureProvider<List<User>>((ref) async {
   }
   return ref.read(apiServiceProvider).getUsers() as Future<List<User>>;
 });
+
+// ── Параметры для запроса графика ─────────────────────────────────────
+// Храним какой датчик выбран и за какой период
+class ChartParams {
+  final int sensorId;
+  final int hours;
+  const ChartParams({required this.sensorId, required this.hours});
+}
+
+final chartParamsProvider = StateProvider<ChartParams>((ref) {
+  return const ChartParams(sensorId: 101, hours: 24);
+});
+
+final sensorHistoryProvider =
+    FutureProvider<List<Map<String, dynamic>>>((ref) async {
+  final params = ref.watch(chartParamsProvider);
+  if (useMock) {
+    return ref
+        .read(mockServiceProvider)
+        .getSensorHistory(params.sensorId, params.hours);
+  }
+  // Здесь будет реальный API запрос
+  return [];
+});

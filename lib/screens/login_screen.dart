@@ -25,16 +25,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   void _handleLogin() {
     final login    = _loginController.text.trim();
     final password = _passwordController.text.trim();
-
     if (login.isEmpty || password.isEmpty) return;
-
-    // Вызываем метод login из нашего провайдера
     ref.read(authProvider.notifier).login(login, password);
   }
 
   @override
   Widget build(BuildContext context) {
-    // Следим за состоянием авторизации
     final authState = ref.watch(authProvider);
 
     return Scaffold(
@@ -44,7 +40,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(24),
             child: ConstrainedBox(
-              // Ограничиваем ширину — на планшете не растягивается
               constraints: const BoxConstraints(maxWidth: 400),
               child: Column(
                 children: [
@@ -79,7 +74,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   ),
                   const SizedBox(height: 40),
 
-                  // Карточка формы
+                  // Карточка формы входа
                   Card(
                     child: Padding(
                       padding: const EdgeInsets.all(24),
@@ -112,8 +107,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             obscureText: !_passwordVisible,
                             decoration: InputDecoration(
                               labelText: 'Пароль',
-                              prefixIcon:
-                                  const Icon(Icons.lock_outline),
+                              prefixIcon: const Icon(Icons.lock_outline),
                               suffixIcon: IconButton(
                                 icon: Icon(
                                   _passwordVisible
@@ -163,9 +157,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
                           // Кнопка входа
                           ElevatedButton(
-                            onPressed: authState.isLoading
-                                ? null
-                                : _handleLogin,
+                            onPressed:
+                                authState.isLoading ? null : _handleLogin,
                             child: authState.isLoading
                                 ? const SizedBox(
                                     height: 22,
@@ -182,26 +175,44 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     ),
                   ),
 
-                  // Подсказка для теста
+                  // Подсказка с тестовыми аккаунтами
                   const SizedBox(height: 20),
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
                       color: Colors.blue.shade50,
                       borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.blue.shade200),
                     ),
                     child: const Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Тестовые данные для входа:',
+                          'Тестовые аккаунты:',
                           style: TextStyle(
                               fontWeight: FontWeight.w600, fontSize: 13),
                         ),
+                        SizedBox(height: 8),
+                        _LoginHint(
+                          role: 'Суперадмин',
+                          login: 'superadmin',
+                          password: 'super123',
+                          color: Color(0xFF7B1FA2),
+                        ),
                         SizedBox(height: 4),
-                        Text('Админ: admin / admin',
-                            style: TextStyle(fontSize: 13)),
-                        Text('Оператор: operator / 1234',
-                            style: TextStyle(fontSize: 13)),
+                        _LoginHint(
+                          role: 'Администратор',
+                          login: 'admin',
+                          password: 'admin',
+                          color: Color(0xFF1565C0),
+                        ),
+                        SizedBox(height: 4),
+                        _LoginHint(
+                          role: 'Сотрудник',
+                          login: 'employee',
+                          password: '1234',
+                          color: Color(0xFF616161),
+                        ),
                       ],
                     ),
                   ),
@@ -211,6 +222,51 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           ),
         ),
       ),
+    );
+  }
+}
+
+// ── Подсказка логина ───────────────────────────────────────────────────
+// ВАЖНО: этот класс должен быть СНАРУЖИ класса LoginScreen
+class _LoginHint extends StatelessWidget {
+  final String role;
+  final String login;
+  final String password;
+  final Color color;
+
+  const _LoginHint({
+    required this.role,
+    required this.login,
+    required this.password,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Container(
+          padding:
+              const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(4),
+          ),
+          child: Text(
+            role,
+            style: TextStyle(
+              fontSize: 11,
+              color: color,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Text(
+          '$login / $password',
+          style: const TextStyle(fontSize: 12, color: Colors.grey),
+        ),
+      ],
     );
   }
 }
